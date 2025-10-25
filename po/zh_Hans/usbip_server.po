@@ -48,3 +48,6 @@ msgstr "未知厂商"
 
 msgid "unknown product"
 msgstr "未知产品"
+
+msgid "No USB devices detected"
+msgstr "未检测到USB设备"

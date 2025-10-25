@@ -135,7 +135,8 @@ get_current_devices() {
     echo "$devices"
 }
 
-# Function to extract busid from device info line	extract_busid() {
+# Function to extract busid from device info line
+extract_busid() {
     echo "$1" | cut -d: -f1
 }
 

@@ -43,8 +43,7 @@ function action_devices()
     
     -- Get all USB devices from sysfs
     local sysfs_devices = sys.exec("ls /sys/bus/usb/devices/ 2>/dev/null | grep -E '^[0-9]+-[0-9]+(\\.[0-9]+)*$'")
-    for device in sysfs_devices:gmatch("[^
-]+") do
+    for device in sysfs_devices:gmatch("[^\n]+") do
         local found = false
         for _, dev in ipairs(devices) do
             if dev.busid == device then

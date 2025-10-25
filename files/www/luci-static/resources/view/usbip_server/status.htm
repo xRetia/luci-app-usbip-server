@@ -3,70 +3,176 @@
 (function() {
     'use strict';
     
+    // 国际化字典
+    var i18n = {
+        'zh-cn': {
+            'Running': '运行中',
+            'Stopped': '已停止',
+            'Loaded': '已加载',
+            'Not Loaded': '未加载',
+            'Checking...': '检查中...',
+            'Loading devices...': '加载设备中...',
+            'Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode.': '按住 Ctrl 键可选择多个设备。选中的设备将用于白名单/黑名单模式。',
+            'Bus ID': '总线ID',
+            'VID:PID': '厂商ID:产品ID',
+            'Vendor': '厂商',
+            'Product': '产品',
+            'Loading...': '加载中...',
+            'No USB devices detected': '未检测到USB设备',
+            'No devices currently bound': '当前没有绑定的设备'
+        },
+        'en': {
+            'Running': 'Running',
+            'Stopped': 'Stopped',
+            'Loaded': 'Loaded',
+            'Not Loaded': 'Not Loaded',
+            'Checking...': 'Checking...',
+            'Loading devices...': 'Loading devices...',
+            'Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode.': 'Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode.',
+            'Bus ID': 'Bus ID',
+            'VID:PID': 'VID:PID',
+            'Vendor': 'Vendor',
+            'Product': 'Product',
+            'Loading...': 'Loading...',
+            'No USB devices detected': 'No USB devices detected',
+            'No devices currently bound': 'No devices currently bound'
+        }
+    };
+    
+    // 获取当前语言
+    var getLanguage = function() {
+        var lang = (navigator.language || navigator.userLanguage).toLowerCase();
+        return i18n[lang] ? lang : (i18n['zh-cn'] ? 'zh-cn' : 'en');
+    };
+    
+    // 翻译函数
+    var translate = function(key) {
+        var lang = getLanguage();
+        return i18n[lang] && i18n[lang][key] ? i18n[lang][key] : key;
+    };
+    
     var updateStatus = function() {
         Promise.all([
-            fetch('<%=luci.dispatcher.build_url("admin/services/usbip_server/status")%>').then(function(r) { return r.json(); }),
-            fetch('<%=luci.dispatcher.build_url("admin/services/usbip_server/devices")%>').then(function(r) { return r.json(); })
+            fetch('<%=luci.dispatcher.build_url("admin/services/usbip_server/status")%>').then(function(r) { 
+                if (!r.ok) throw new Error('Network response was not ok');
+                return r.json(); 
+            }),
+            fetch('<%=luci.dispatcher.build_url("admin/services/usbip_server/devices")%>').then(function(r) { 
+                if (!r.ok) throw new Error('Network response was not ok');
+                return r.json(); 
+            })
         ]).then(function(data) {
-            var status = data[0];
-            var devices = data[1];
+            var status = data[0] || {};
+            var devices = data[1] || [];
+            
+            // 确保 devices 是数组
+            if (!Array.isArray(devices)) {
+                devices = [];
+            }
             
             // Update status indicators
             document.getElementById('monitor-status').className = status.monitor_running ? 'status-running' : 'status-stopped';
             document.getElementById('monitor-status').textContent = status.monitor_running ? 
-                '<%=luci.i18n.translate("Running")%>' : '<%=luci.i18n.translate("Stopped")%>';
+                translate('Running') : translate('Stopped');
             
             document.getElementById('server-status').className = status.server_running ? 'status-running' : 'status-stopped';
             document.getElementById('server-status').textContent = status.server_running ? 
-                '<%=luci.i18n.translate("Running")%>' : '<%=luci.i18n.translate("Stopped")%>';
+                translate('Running') : translate('Stopped');
             
             document.getElementById('module-status').className = status.modules_loaded ? 'status-running' : 'status-stopped';
             document.getElementById('module-status').textContent = status.modules_loaded ? 
-                '<%=luci.i18n.translate("Loaded")%>' : '<%=luci.i18n.translate("Not Loaded")%>';
+                translate('Loaded') : translate('Not Loaded');
             
             // Update device list for selection
             var deviceSelect = document.getElementById('device-select');
             if (deviceSelect) {
                 deviceSelect.innerHTML = '';
-                devices.forEach(function(device) {
+                
+                if (devices.length === 0) {
                     var option = document.createElement('option');
-                    option.value = device.busid;
-                    option.textContent = device.busid + ' - ' + device.vendor + ' : ' + device.product + ' (' + device.vid_pid + ')';
-                    option.selected = device.bound;
+                    option.value = '';
+                    option.textContent = translate('No USB devices detected');
                     deviceSelect.appendChild(option);
-                });
+                } else {
+                    devices.forEach(function(device) {
+                        var option = document.createElement('option');
+                        option.value = device.busid;
+                        option.textContent = device.busid + ' - ' + device.vendor + ' : ' + device.product + ' (' + device.vid_pid + ')';
+                        option.selected = device.bound;
+                        deviceSelect.appendChild(option);
+                    });
+                }
             }
             
             // Update bound devices table
-            var boundDevices = devices.filter(function(d) { return d.bound; });
             var boundTable = document.getElementById('bound-devices');
             if (boundTable) {
                 boundTable.innerHTML = '';
-                boundDevices.forEach(function(device) {
-                    var row = document.createElement('tr');
-                    row.innerHTML = '<td>' + device.busid + '</td>' +
-                                   '<td>' + device.vid_pid + '</td>' +
-                                   '<td>' + device.vendor + '</td>' +
-                                   '<td>' + device.product + '</td>';
-                    boundTable.appendChild(row);
-                });
                 
-                if (boundDevices.length === 0) {
-                    var row = document.createElement('tr');
-                    row.innerHTML = '<td colspan="4" class="text-center"><%=luci.i18n.translate("No devices currently bound")%></td>';
-                    boundTable.appendChild(row);
+                if (devices.length === 0) {
+                    var noDeviceRow = document.createElement('tr');
+                    noDeviceRow.innerHTML = '<td colspan="4" class="text-center">' + translate('No USB devices detected') + '</td>';
+                    boundTable.appendChild(noDeviceRow);
+                } else {
+                    // 过滤出已绑定的设备
+                    var boundDevices = devices.filter(function(d) { return d.bound; });
+                    
+                    if (boundDevices.length === 0) {
+                        var row = document.createElement('tr');
+                        row.innerHTML = '<td colspan="4" class="text-center">' + translate('No devices currently bound') + '</td>';
+                        boundTable.appendChild(row);
+                    } else {
+                        boundDevices.forEach(function(device) {
+                            var row = document.createElement('tr');
+                            row.innerHTML = '<td>' + device.busid + '</td>' +
+                                           '<td>' + device.vid_pid + '</td>' +
+                                           '<td>' + device.vendor + '</td>' +
+                                           '<td>' + device.product + '</td>';
+                            boundTable.appendChild(row);
+                        });
+                    }
                 }
             }
         }).catch(function(err) {
             console.error('Failed to update status:', err);
+            
+            // 出错时更新UI显示错误状态
+            var boundTable = document.getElementById('bound-devices');
+            if (boundTable) {
+                boundTable.innerHTML = '';
+                var errorRow = document.createElement('tr');
+                errorRow.innerHTML = '<td colspan="4" class="text-center">' + translate('No USB devices detected') + '</td>';
+                boundTable.appendChild(errorRow);
+            }
+            
+            var deviceSelect = document.getElementById('device-select');
+            if (deviceSelect) {
+                deviceSelect.innerHTML = '';
+                var option = document.createElement('option');
+                option.value = '';
+                option.textContent = translate('No USB devices detected');
+                deviceSelect.appendChild(option);
+            }
         });
     };
     
-    // Initial update
-    updateStatus();
+    // 初始化页面翻译
+    var initTranslation = function() {
+        var elements = document.querySelectorAll('[data-i18n]');
+        elements.forEach(function(el) {
+            var key = el.getAttribute('data-i18n');
+            el.textContent = translate(key);
+        });
+    };
     
-    // Update every 5 seconds
-    setInterval(updateStatus, 5000);
+    // 初始更新
+    document.addEventListener('DOMContentLoaded', function() {
+        initTranslation();
+        updateStatus();
+        
+        // 每5秒更新一次状态
+        setInterval(updateStatus, 5000);
+    });
     
     // Add custom CSS
     var style = document.createElement('style');
@@ -84,47 +190,47 @@
 </script>
 
 <div class="cbi-section">
-    <h3><%=luci.i18n.translate("USBIP Server Status")%></h3>
+    <h3 data-i18n="USBIP Server Status">USBIP Server Status</h3>
     <div class="table">
         <div class="tr">
-            <div class="td left" width="33%"><strong><%=luci.i18n.translate("Monitor Service")%>:</strong></div>
-            <div class="td left"><span id="monitor-status"><%=luci.i18n.translate("Checking...")%></span></div>
+            <div class="td left" width="33%"><strong data-i18n="Monitor Service">Monitor Service</strong>:</div>
+            <div class="td left"><span id="monitor-status" data-i18n="Checking...">Checking...</span></div>
         </div>
         <div class="tr">
-            <div class="td left" width="33%"><strong><%=luci.i18n.translate("USBIP Server")%>:</strong></div>
-            <div class="td left"><span id="server-status"><%=luci.i18n.translate("Checking...")%></span></div>
+            <div class="td left" width="33%"><strong data-i18n="USBIP Server">USBIP Server</strong>:</div>
+            <div class="td left"><span id="server-status" data-i18n="Checking...">Checking...</span></div>
         </div>
         <div class="tr">
-            <div class="td left" width="33%"><strong><%=luci.i18n.translate("Kernel Modules")%>:</strong></div>
-            <div class="td left"><span id="module-status"><%=luci.i18n.translate("Checking...")%></span></div>
+            <div class="td left" width="33%"><strong data-i18n="Kernel Modules">Kernel Modules</strong>:</div>
+            <div class="td left"><span id="module-status" data-i18n="Checking...">Checking...</span></div>
         </div>
     </div>
 </div>
 
 <div class="cbi-section">
-    <h3><%=luci.i18n.translate("Available USB Devices")%></h3>
+    <h3 data-i18n="Available USB Devices">Available USB Devices</h3>
     <select multiple="multiple" id="device-select" class="cbi-input-select">
-        <option value=""><%=luci.i18n.translate("Loading devices...")%></option>
+        <option value="" data-i18n="Loading devices...">Loading devices...</option>
     </select>
     <div class="cbi-value-description">
-        <%=luci.i18n.translate("Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode.")%>
+        <span data-i18n="Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode.">Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode.</span>
     </div>
 </div>
 
 <div class="cbi-section">
-    <h3><%=luci.i18n.translate("Currently Bound Devices")%></h3>
+    <h3 data-i18n="Currently Bound Devices">Currently Bound Devices</h3>
     <table class="device-table">
         <thead>
             <tr>
-                <th><%=luci.i18n.translate("Bus ID")%></th>
-                <th><%=luci.i18n.translate("VID:PID")%></th>
-                <th><%=luci.i18n.translate("Vendor")%></th>
-                <th><%=luci.i18n.translate("Product")%></th>
+                <th data-i18n="Bus ID">Bus ID</th>
+                <th data-i18n="VID:PID">VID:PID</th>
+                <th data-i18n="Vendor">Vendor</th>
+                <th data-i18n="Product">Product</th>
             </tr>
         </thead>
         <tbody id="bound-devices">
             <tr>
-                <td colspan="4" class="text-center"><%=luci.i18n.translate("Loading...")%></td>
+                <td colspan="4" class="text-center" data-i18n="Loading...">Loading...</td>
             </tr>
         </tbody>
     </table>
