@@ -1,0 +1,14 @@
+<div class="cbi-section">
+    <h3><%=luci.i18n.translate("USB Devices Help")%></h3>
+    <div class="cbi-value-description">
+        <p><%=luci.i18n.translate("To use this USBIP server:")%></p>
+        <ol>
+            <li><%=luci.i18n.translate("Make sure required kernel modules are installed:")%> <code>opkg update && opkg install usbip usbip-server usbip-client kmod-usbip kmod-usbip-client kmod-usbip-server</code></li>
+            <li><%=luci.i18n.translate("Enable the USBIP server above")%></li>
+            <li><%=luci.i18n.translate("Select devices to share using the device list")%></li>
+            <li><%=luci.i18n.translate("On client computers:")%></li>
+        </ol>
+        <p><%=luci.i18n.translate("For Linux clients:")%> <code>usbip attach -r [server_ip] -b [busid]</code></p>
+        <p><%=luci.i18n.translate("For Windows clients, use usbip-win2 client software")%></p>
+    </div>
+</div>

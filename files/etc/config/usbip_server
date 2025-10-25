@@ -1,0 +1,6 @@
+config usbip_server 'config'
+    option enabled '0'
+    option registration_mode 'all'
+    option device_list ''
+    option server_port '3240'
+    option auto_bind '1'

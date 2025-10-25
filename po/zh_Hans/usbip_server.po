@@ -1,0 +1,50 @@
+msgid "USBIP Server"
+msgstr "USBIP 服务端"
+
+msgid "USBIP Server Configuration"
+msgstr "USBIP 服务端配置"
+
+msgid "Share your OpenWRT USB devices over TCP/IP network. Install <a href=\"https://github.com/vadimgrn/usbip-win2\" target=\"_blank\">usbip-win2</a> client software on your Windows computers. This package is generated with DeepSeek AI technology."
+msgstr "通过 TCP/IP 网络共享您的 OpenWRT USB 设备。请在您的 Windows 电脑上安装 <a href=\"https://github.com/vadimgrn/usbip-win2\" target=\"_blank\">usbip-win2</a> 客户端软件。本软件包通过 DeepSeek AI 技术生成。"
+
+msgid "Server Settings"
+msgstr "服务器设置"
+
+msgid "Enable USBIP Server"
+msgstr "启用 USBIP 服务端"
+
+msgid "Enable USBIP server and device monitoring"
+msgstr "启用 USBIP 服务器和设备监控"
+
+msgid "Server Port"
+msgstr "服务器端口"
+
+msgid "TCP port for USBIP server (default: 3240)"
+msgstr "USBIP 服务器的 TCP 端口（默认：3240）"
+
+msgid "Device Registration"
+msgstr "设备注册"
+
+msgid "Control which USB devices are automatically shared"
+msgstr "控制哪些 USB 设备自动共享"
+
+msgid "All Devices"
+msgstr "全部设备"
+
+msgid "Specific Devices (Whitelist)"
+msgstr "指定设备（白名单）"
+
+msgid "All Except Specific Devices (Blacklist)"
+msgstr "除指定设备外（黑名单）"
+
+msgid "USB Devices"
+msgstr "USB 设备列表"
+
+msgid "Select USB devices to include/exclude based on registration mode above"
+msgstr "根据上述注册模式选择要包含/排除的 USB 设备"
+
+msgid "unknown vendor"
+msgstr "未知厂商"
+
+msgid "unknown product"
+msgstr "未知产品"
