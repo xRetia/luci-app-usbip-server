@@ -23,13 +23,41 @@
             document.getElementById('module-status').textContent = status.modules_loaded ? 
                 '<%=luci.i18n.translate("Loaded")%>' : '<%=luci.i18n.translate("Not Loaded")%>';
             
-            // 尝试获取绑定的设备信息（简化版）
+            // 更新绑定设备列表
             var boundTable = document.getElementById('bound-devices');
             if (boundTable) {
                 boundTable.innerHTML = '';
-                var row = document.createElement('tr');
-                row.innerHTML = '<td colspan="4" class="text-center"><%=luci.i18n.translate("No devices currently bound")%></td>';
-                boundTable.appendChild(row);
+                
+                if (status.bound_devices && status.bound_devices.length > 0) {
+                    // 有绑定设备，显示设备列表
+                    for (var i = 0; i < status.bound_devices.length; i++) {
+                        var device = status.bound_devices[i];
+                        var row = document.createElement('tr');
+                        
+                        var busidCell = document.createElement('td');
+                        busidCell.textContent = device.busid || '';
+                        row.appendChild(busidCell);
+                        
+                        var vidpidCell = document.createElement('td');
+                        vidpidCell.textContent = device.vid_pid || '';
+                        row.appendChild(vidpidCell);
+                        
+                        var vendorCell = document.createElement('td');
+                        vendorCell.textContent = device.vendor || '';
+                        row.appendChild(vendorCell);
+                        
+                        var productCell = document.createElement('td');
+                        productCell.textContent = device.product || '';
+                        row.appendChild(productCell);
+                        
+                        boundTable.appendChild(row);
+                    }
+                } else {
+                    // 没有绑定设备
+                    var row = document.createElement('tr');
+                    row.innerHTML = '<td colspan="4" class="text-center"><%=luci.i18n.translate("No devices currently bound")%></td>';
+                    boundTable.appendChild(row);
+                }
             }
         }).catch(function(err) {
             console.error('Failed to update status:', err);
