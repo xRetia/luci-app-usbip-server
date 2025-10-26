@@ -43,11 +43,17 @@ msgstr "USB 设备列表"
 msgid "Select USB devices to include/exclude based on registration mode above"
 msgstr "根据上述注册模式选择要包含/排除的 USB 设备"
 
+msgid "Format: BusID - Vendor Product (VID:PID)"
+msgstr "格式：总线ID - 厂商 产品 (厂商ID:产品ID)"
+
 msgid "unknown vendor"
 msgstr "未知厂商"
 
 msgid "unknown product"
 msgstr "未知产品"
+
+msgid "Plugged out"
+msgstr "已拔出"
 
 msgid "No USB devices detected"
 msgstr "未检测到USB设备"
