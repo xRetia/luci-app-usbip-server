@@ -65,7 +65,9 @@ define Package/$(PKG_NAME)/postinst
 	# Enable and start our monitor service
 	/etc/init.d/usbip_monitor enable
 	/etc/init.d/usbip_monitor start
-		echo "USBIP Server installed successfully!"
+	
+	# Display installation information
+	echo "USBIP Server installed successfully!"
 	echo "Original usbipd service has been disabled to avoid conflicts."
 	echo "Please install required kernel modules:"
 	echo "opkg update && opkg install usbip usbip-server usbip-client kmod-usbip kmod-usbip-client kmod-usbip-server"
