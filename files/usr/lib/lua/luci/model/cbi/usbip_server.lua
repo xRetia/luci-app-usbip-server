@@ -24,7 +24,25 @@ m = Map("usbip_server", i18n("USBIP Server Configuration"),
 
 -- Add post-commit handler to restart service
 function m.on_after_commit(self)
-    sys.call("/etc/init.d/usbip_monitor restart")
+    local ucic = uci.cursor()
+    local is_enabled = ucic:get_bool("usbip_server", "config", "enabled")
+    
+    if not is_enabled then
+        -- If disabled, stop and disable the service
+        sys.call("/etc/init.d/usbip_monitor stop")
+        sys.call("/etc/init.d/usbip_monitor disable")
+    else
+        -- If enabled, enable and start the service
+        sys.call("/etc/init.d/usbip_monitor enable")
+        
+        -- Check if service is already running before restarting
+        local running = sys.call("/etc/init.d/usbip_monitor status >/dev/null 2>&1") == 0
+        if running then
+            sys.call("/etc/init.d/usbip_monitor restart")
+        else
+            sys.call("/etc/init.d/usbip_monitor start")
+        end
+    end
 end
 
 -- Add status template
