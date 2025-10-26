@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@usbip_server[-1]
+	add ucitrack usbip_server
+	set ucitrack.@usbip_server[-1].init=usbip_server
+	commit ucitrack
+EOF
+
+rm -f /tmp/luci-indexcache
+exit 0

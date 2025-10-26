@@ -1,0 +1,10 @@
+Package: luci-app-usbip-server
+Version: 1.0.1-xretia-deepseek
+Depends: usbip usbip-server usbip-client kmod-usbip kmod-usbip-client kmod-usbip-server lua luci-base luci-compat
+Source: feeds/xRetia/luci-app-usbip-server
+SourceName: luci-app-usbip-server
+Section: luci
+SourceDateEpoch: 1632283074
+Architecture: all
+Installed-Size: 25423
+Description:  This package contains LuCI configuration pages for USBIP Service.

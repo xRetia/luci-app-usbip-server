@@ -2,7 +2,7 @@ local i18n = luci.i18n.translate
 local sys = require "luci.sys"
 local uci = require "luci.model.uci"
 
--- 直接使用uci对象确保配置存在
+-- Ensure configuration exists
 local ucic = uci.cursor()
 if not ucic:get("usbip_server", "config") then
     ucic:section("usbip_server", "config", nil, {
@@ -15,27 +15,27 @@ if not ucic:get("usbip_server", "config") then
     ucic:commit("usbip_server")
 end
 
--- 创建Map对象
+-- Create Map object
 m = Map("usbip_server", i18n("USBIP Server Configuration"),
     i18n([[Share your OpenWRT USB devices over TCP/IP network. 
     Install <a href="https://github.com/vadimgrn/usbip-win2" target="_blank">usbip-win2</a> 
     client software on your Windows computers. 
     This package is generated with DeepSeek AI technology.]]))
 
--- 添加配置保存后的处理函数，重启服务
+-- Add post-commit handler to restart service
 function m.on_after_commit(self)
     sys.call("/etc/init.d/usbip_monitor restart")
 end
 
--- 添加状态模板
+-- Add status template
 m:section(SimpleSection).template = "usbip_server/status"
 
--- 使用TypedSection并设置正确的配置类型
+-- Use TypedSection with correct configuration type
 s = m:section(TypedSection, "config", i18n("Server Settings"))
 s.anonymous = true
 s.addremove = false
 
--- 确保配置节存在
+-- Ensure config section exists
 s.cfgsections = function()
     return { "config" }
 end

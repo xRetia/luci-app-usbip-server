@@ -185,7 +185,7 @@ start_usbip_server() {
     log_message "Starting USBIP server on port $port"
     
     # Kill any existing usbipd processes (including the original one)
-    killall usbipd 2>/dev/null
+    /usr/bin/killall usbipd 2>/dev/null
     sleep 1
     
     # Start usbipd daemon with our configuration
@@ -203,7 +203,7 @@ start_usbip_server() {
 # Function to stop USBIP server
 stop_usbip_server() {
     log_message "Stopping USBIP server"
-    killall usbipd 2>/dev/null
+    /usr/bin/killall usbipd 2>/dev/null
     log_message "USBIP server stopped"
 }
 
@@ -359,6 +359,14 @@ cleanup() {
 main() {
     log_message "Starting USBIP Device Monitor and Auto-Bind Script"
     
+    # Check if service is enabled before proceeding
+    local enabled=$(get_config "enabled")
+    if [ "$enabled" != "1" ]; then
+        log_message "USBIP server is disabled in configuration (enabled=0), exiting"
+        /usr/bin/killall usbipd 2>/dev/null
+        exit 0
+    fi
+    
     # Set up signal handlers
     trap cleanup TERM INT
     
@@ -384,6 +392,9 @@ main() {
     
     # Initialize and bind existing devices
     initialize_devices
+    
+    # Start USBIP server
+    start_usbip_server
     
     # Start monitoring loop
     monitor_loop

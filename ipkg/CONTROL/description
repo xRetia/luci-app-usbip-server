@@ -1,0 +1,3 @@
+  LuCI interface for USBIP Server - Share USB devices over TCP/IP network.
+  This package allows you to use your OpenWRT device as a USB server, 
+  sharing USB devices with remote clients. Generated with DeepSeek AI technology.

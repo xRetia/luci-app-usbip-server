@@ -51,3 +51,57 @@ msgstr "未知产品"
 
 msgid "No USB devices detected"
 msgstr "未检测到USB设备"
+
+msgid "USBIP Server Status"
+msgstr "USBIP 服务端状态"
+
+msgid "Monitor Service"
+msgstr "监控服务"
+
+msgid "Kernel Modules"
+msgstr "内核模块"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Loaded"
+msgstr "已加载"
+
+msgid "Not Loaded"
+msgstr "未加载"
+
+msgid "Checking..."
+msgstr "检查中..."
+
+msgid "Available USB Devices"
+msgstr "可用的 USB 设备"
+
+msgid "Loading devices..."
+msgstr "加载设备中..."
+
+msgid "Hold Ctrl to select multiple devices. Selected devices will be used in whitelist/blacklist mode."
+msgstr "按住 Ctrl 键可选择多个设备。选中的设备将用于白名单/黑名单模式。"
+
+msgid "Currently Bound Devices"
+msgstr "当前已绑定设备"
+
+msgid "Bus ID"
+msgstr "总线ID"
+
+msgid "VID:PID"
+msgstr "厂商ID:产品ID"
+
+msgid "Vendor"
+msgstr "厂商"
+
+msgid "Product"
+msgstr "产品"
+
+msgid "Loading..."
+msgstr "加载中..."
+
+msgid "No devices currently bound"
+msgstr "当前没有绑定的设备"

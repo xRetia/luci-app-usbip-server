@@ -1,0 +1,10 @@
+#!/bin/sh
+[ -n "${IPKG_INSTROOT}" ] || {
+	# Stop our services
+	/etc/init.d/usbip_monitor stop
+	/etc/init.d/usbip_monitor disable
+	
+	# Note: We don't re-enable the original usbipd service automatically
+	# to avoid unexpected behavior during upgrades
+}
+exit 0

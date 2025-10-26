@@ -32,9 +32,28 @@ start_service() {
 }
 
 stop_service() {
-    # Stop our monitor and usbipd server
-    killall usbip_monitor.sh 2>/dev/null
-    killall usbipd 2>/dev/null
+    # Stop our monitor and usbipd server with timeout protection
+    local timeout=5
+    
+    # Try to kill processes with TERM signal first
+    pkill -f "usbip_monitor.sh" 2>/dev/null
+    pkill -f "usbipd" 2>/dev/null
+    
+    # Wait for processes to terminate with timeout
+    local count=0
+    while [ $count -lt $timeout ]; do
+        if ! pgrep -f "usbip_monitor.sh" >/dev/null && ! pgrep -f "usbipd" >/dev/null; then
+            break
+        fi
+        count=$((count + 1))
+        sleep 1
+    done
+    
+    # If processes still running after timeout, use killall as fallback
+    if pgrep -f "usbip_monitor.sh" >/dev/null || pgrep -f "usbipd" >/dev/null; then
+        killall -9 usbip_monitor.sh 2>/dev/null
+        killall -9 usbipd 2>/dev/null
+    fi
 }
 
 restart() {
