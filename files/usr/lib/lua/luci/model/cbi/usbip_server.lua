@@ -58,9 +58,47 @@ mode:value("whitelist", i18n("Specific Devices (Whitelist)"))
 mode:value("blacklist", i18n("All Except Specific Devices (Blacklist)"))
 mode.default = "all"
 
+-- Function to get USB devices from sysfs
+function get_usb_devices()
+    local devices = {}
+    local sysfs_devices = sys.exec("ls /sys/bus/usb/devices/ 2>/dev/null | grep -E '^[0-9]+-[0-9]+(\\.[0-9]+)*$'")
+    
+    for device in sysfs_devices:gmatch("[^\n]+") do
+        local vendor = sys.exec(string.format("cat /sys/bus/usb/devices/%s/idVendor 2>/dev/null", device)) or "unknown"
+        local product = sys.exec(string.format("cat /sys/bus/usb/devices/%s/idProduct 2>/dev/null", device)) or "unknown"
+        local manufacturer = sys.exec(string.format("cat /sys/bus/usb/devices/%s/manufacturer 2>/dev/null", device)) or i18n("unknown vendor")
+        local product_name = sys.exec(string.format("cat /sys/bus/usb/devices/%s/product 2>/dev/null", device)) or i18n("unknown product")
+        
+        -- Clean up strings
+        vendor = vendor:gsub("%s+", "")
+        product = product:gsub("%s+", "")
+        manufacturer = manufacturer:gsub("^%s*(.-)%s*$", "%1")
+        product_name = product_name:gsub("^%s*(.-)%s*$", "%1")
+        
+        -- Create display name
+        local display_name = string.format("%s - %s %s", device, manufacturer, product_name)
+        
+        -- Add to devices table
+        devices[device] = display_name
+    end
+    
+    return devices
+end
+
+-- Create device list as DynamicList with dropdown options
 devices = s:option(DynamicList, "device_list", i18n("USB Devices"),
     i18n("Select USB devices to include/exclude based on registration mode above"))
 devices:depends("registration_mode", "whitelist")
 devices:depends("registration_mode", "blacklist")
+
+-- Set up dropdown options for DynamicList
+devices.widget = "combobox"
+devices.cast = nil -- Allow free-form input but show dropdown options
+
+-- Populate dropdown options
+local usb_devices = get_usb_devices()
+for busid, display_name in pairs(usb_devices) do
+    devices:value(busid, display_name)
+end
 
 return m
