@@ -14,9 +14,10 @@ function action_status()
     
     -- 初始化状态信息
     local status = {
-        monitor_running = (sys.exec("pgrep -f usbip_monitor.sh >/dev/null && echo running || echo stopped") == "running\n"),
-        server_running = (sys.exec("pgrep -f usbipd >/dev/null && echo running || echo stopped") == "running\n"),
-        modules_loaded = (sys.exec("lsmod | grep -q usbip_core && echo loaded || echo not_loaded") == "loaded\n"),
+        -- 改进的状态检测，去除多余的换行符以确保准确比较
+        monitor_running = (sys.exec("pgrep -f 'usbip_monitor' >/dev/null && echo running || echo stopped"):gsub("\n", "") == "running"),
+        server_running = (sys.exec("pgrep -x usbipd >/dev/null && echo running || echo stopped"):gsub("\n", "") == "running"),
+        modules_loaded = (sys.exec("lsmod | grep -q usbip_core && echo loaded || echo not_loaded"):gsub("\n", "") == "loaded"),
         bound_devices = {}
     }
     

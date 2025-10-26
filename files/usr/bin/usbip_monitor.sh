@@ -189,7 +189,7 @@ start_usbip_server() {
     sleep 1
     
     # Start usbipd daemon with our configuration
-    usbipd -D -4 -t -p "$port"
+    usbipd -D -4 -t -p $port
     
     if [ $? -eq 0 ]; then
         log_message "USBIP server started successfully on port $port"
