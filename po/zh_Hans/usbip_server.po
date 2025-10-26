@@ -29,13 +29,13 @@ msgid "Control which USB devices are automatically shared"
 msgstr "控制哪些 USB 设备自动共享"
 
 msgid "All Devices"
-msgstr "全部设备"
+msgstr "注册全部设备"
 
 msgid "Specific Devices (Whitelist)"
-msgstr "指定设备（白名单）"
+msgstr "仅注册指定设备（白名单）"
 
 msgid "All Except Specific Devices (Blacklist)"
-msgstr "除指定设备外（黑名单）"
+msgstr "全注册，除指定设备外（黑名单）"
 
 msgid "USB Devices"
 msgstr "USB 设备列表"
