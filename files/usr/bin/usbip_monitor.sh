@@ -66,8 +66,6 @@ read_config() {
     CONFIG_SERVER_PORT="${server_port:-3240}"
     CONFIG_AUTO_BIND="${auto_bind:-0}"
     CONFIG_DEVICE_LIST="${device_list:-}"
-    
-    log_debug "Config: enabled=$CONFIG_ENABLED, mode=$CONFIG_REGISTRATION_MODE, port=$CONFIG_SERVER_PORT, auto_bind=$CONFIG_AUTO_BIND, devices=$CONFIG_DEVICE_LIST"
 }
 
 # 获取所有USB设备（忽略HUB设备）
@@ -79,8 +77,6 @@ get_all_usb_devices() {
             # 忽略USB HUB设备
             if ! is_usb_hub "$busid"; then
                 echo "$busid"
-            else
-                log_debug "Ignoring USB HUB device: $busid"
             fi
         fi
     done | sort
@@ -125,26 +121,35 @@ unbind_device() {
 apply_binding_policy() {
     local all_devices=$(get_all_usb_devices)
     local bound_devices=$(get_bound_devices)
-    
-    log_debug "All USB devices (excluding HUBs): $all_devices"
-    log_debug "Bound devices: $bound_devices"
+    local changed=0
     
     case "$CONFIG_REGISTRATION_MODE" in
         "all")
-            log_info "Applying 'all' registration mode"
             # 绑定所有设备（已自动忽略HUB）
             for busid in $all_devices; do
                 if ! echo "$bound_devices" | grep -q "^$busid$"; then
-                    if is_usb_hub "$busid"; then
-                        continue
+                    if bind_device "$busid"; then
+                        changed=1
                     fi
-                    bind_device "$busid"
                 fi
             done
+            
+            # 解绑不在当前设备列表中的设备
+            for busid in $bound_devices; do
+                if ! echo "$all_devices" | grep -q "^$busid$"; then
+                    if unbind_device "$busid"; then
+                        changed=1
+                    fi
+                fi
+            done
+            
+            if [ "$changed" -eq 1 ]; then
+                log_info "Applied 'all' registration mode - devices updated"
+            fi
             ;;
             
         "whitelist")
-            log_info "Applying 'whitelist' registration mode"
+            local bound_changed=0
             # 绑定白名单中的设备
             for busid in $CONFIG_DEVICE_LIST; do
                 # 即使白名单中包含HUB设备，也忽略它
@@ -154,38 +159,54 @@ apply_binding_policy() {
                 
                 if echo "$all_devices" | grep -q "^$busid$"; then
                     if ! echo "$bound_devices" | grep -q "^$busid$"; then
-                        bind_device "$busid"
+                        if bind_device "$busid"; then
+                            bound_changed=1
+                        fi
                     fi
-                else
-                    log_warn "Device $busid in whitelist not found"
                 fi
             done
             
             # 解绑不在白名单中的已绑定设备
+            local unbound_changed=0
             for busid in $bound_devices; do
                 if ! echo "$CONFIG_DEVICE_LIST" | grep -q "$busid"; then
-                    unbind_device "$busid"
+                    if unbind_device "$busid"; then
+                        unbound_changed=1
+                    fi
                 fi
             done
+            
+            if [ "$bound_changed" -eq 1 ] || [ "$unbound_changed" -eq 1 ]; then
+                log_info "Applied 'whitelist' registration mode - devices updated"
+            fi
             ;;
             
         "blacklist")
-            log_info "Applying 'blacklist' registration mode"
+            local bound_changed=0
             # 绑定不在黑名单中的设备
             for busid in $all_devices; do
                 if ! echo "$CONFIG_DEVICE_LIST" | grep -q "$busid"; then
                     if ! echo "$bound_devices" | grep -q "^$busid$"; then
-                        bind_device "$busid"
+                        if bind_device "$busid"; then
+                            bound_changed=1
+                        fi
                     fi
                 fi
             done
             
             # 解绑在黑名单中的设备
+            local unbound_changed=0
             for busid in $bound_devices; do
                 if echo "$CONFIG_DEVICE_LIST" | grep -q "$busid"; then
-                    unbind_device "$busid"
+                    if unbind_device "$busid"; then
+                        unbound_changed=1
+                    fi
                 fi
             done
+            
+            if [ "$bound_changed" -eq 1 ] || [ "$unbound_changed" -eq 1 ]; then
+                log_info "Applied 'blacklist' registration mode - devices updated"
+            fi
             ;;
             
         *)
@@ -246,8 +267,6 @@ monitor_usb_devices() {
         # 检查设备变化
         if [ "$last_devices" != "$current_devices" ]; then
             log_info "USB device change detected"
-            log_debug "Previous devices: $last_devices"
-            log_debug "Current devices: $current_devices"
             changed=1
         fi
         
