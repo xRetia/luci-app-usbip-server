@@ -16,7 +16,7 @@ function action_status()
     local status = {
         -- 改进的状态检测，去除多余的换行符以确保准确比较
         monitor_running = (sys.exec("/etc/init.d/usbip_monitor status"):gsub("\n", "") == "running"),
-        server_running = (sys.exec("pgrep -f /usr/sbin/usbipd >/dev/null && echo running || echo stopped"):gsub("\n", "") == "running"),
+        server_running = (sys.exec("netstat -antlp | grep usbipd >/dev/null && echo running || echo stopped"):gsub("\n", "") == "running"),
         modules_loaded = (sys.exec("lsmod | grep -q usbip_core && echo loaded || echo not_loaded"):gsub("\n", "") == "loaded"),
         bound_devices = {}
     }

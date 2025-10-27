@@ -120,8 +120,15 @@ devices.widget = "combobox"
 devices.cast = nil
 
 local usb_devices = get_usb_devices()
+local has_devices = false
 for busid, display_name in pairs(usb_devices) do
     devices:value(busid, display_name)
+    has_devices = true
+end
+
+-- 如果没有可用设备，添加提示信息
+if not has_devices then
+    devices.description = devices.description .. "<br/><br/><span style='color: #ff0000;'>" .. i18n("No USB devices available") .. "</span>"
 end
 
 return m

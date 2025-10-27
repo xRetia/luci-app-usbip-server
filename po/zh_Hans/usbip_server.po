@@ -111,3 +111,6 @@ msgstr "加载中..."
 
 msgid "No devices currently bound"
 msgstr "当前没有绑定的设备"
+
+msgid "No USB devices available"
+msgstr "没有可用的USB设备"
