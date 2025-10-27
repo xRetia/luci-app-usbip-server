@@ -23,12 +23,6 @@ start_service() {
     procd_set_param stderr 1
     procd_set_param pidfile "$PIDFILE"
     procd_close_instance
-    
-    # Start usbipd server if enabled in configuration
-    if [ "$(uci -q get usbip_server.config.enabled)" = "1" ]; then
-        local port=$(uci -q get usbip_server.config.server_port)
-        /usr/sbin/usbipd -D -4 -t -p "${port:-3240}" &
-    fi
 }
 
 stop_service() {
@@ -36,8 +30,8 @@ stop_service() {
     local timeout=5
     
     # Try to kill processes with TERM signal first
-    pkill -f "usbip_monitor.sh" 2>/dev/null
-    pkill -f "usbipd" 2>/dev/null
+    killall -f "usbip_monitor.sh" 2>/dev/null
+    killall -f "usbipd" 2>/dev/null
     
     # Wait for processes to terminate with timeout
     local count=0
@@ -58,7 +52,6 @@ stop_service() {
 
 restart() {
     stop
-    sleep 2
     start
 }
 

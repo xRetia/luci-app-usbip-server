@@ -93,9 +93,18 @@ function get_usb_devices()
         detected_devices[device] = true
     end
     
-    for _, busid in ipairs(configured_devices) do
-        if not detected_devices[busid] then
-            devices[busid] = string.format("%s - %s", busid, i18n("Plugged out"))
+    -- 修复处理已配置设备列表的逻辑，确保正确处理空格分隔的值
+    for _, value in ipairs(configured_devices) do
+        -- 如果值包含空格，尝试分割并单独处理每个设备ID
+        if string.find(value, "%s") then
+            for busid in string.gmatch(value, "([^%s]+)") do
+                if not detected_devices[busid] then
+                    devices[busid] = string.format("%s - %s", busid, i18n("Plugged out"))
+                end
+            end
+        elseif not detected_devices[value] then
+            -- 处理单个设备ID
+            devices[value] = string.format("%s - %s", value, i18n("Plugged out"))
         end
     end
     
