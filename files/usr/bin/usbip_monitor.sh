@@ -9,16 +9,6 @@ USBIPD_CMD="/usr/sbin/usbipd"
 KILLALL_CMD="/usr/bin/killall"
 UCI_CMD="/sbin/uci"
 LOGGER_CMD="/usr/bin/logger"
-SLEEP_CMD="/bin/sleep"
-BASENAME_CMD="/usr/bin/basename"
-LS_CMD="/bin/ls"
-GREP_CMD="/bin/grep"
-AWK_CMD="/usr/bin/awk"
-SORT_CMD="/usr/bin/sort"
-COMM_CMD="/usr/bin/comm"
-CAT_CMD="/bin/cat"
-TEST_CMD="/bin/test"
-ECHO_CMD="/bin/echo"
 
 # 日志函数
 log() {
@@ -55,46 +45,11 @@ is_usb_hub() {
     
     # 检查设备类别，USB HUB的设备类别通常是09
     if [ -f "$device_path/bDeviceClass" ]; then
-        local device_class=$($CAT_CMD "$device_path/bDeviceClass" 2>/dev/null)
+        local device_class=$(cat "$device_path/bDeviceClass" 2>/dev/null)
         if [ "$device_class" = "09" ]; then
             return 0  # 是USB HUB
         fi
     fi
-    
-    # 检查设备描述，包含"hub"或"HUB"
-    if [ -f "$device_path/product" ]; then
-        local product=$($CAT_CMD "$device_path/product" 2>/dev/null | tr '[:upper:]' '[:lower:]')
-        if $ECHO_CMD "$product" | $GREP_CMD -q "hub"; then
-            return 0  # 是USB HUB
-        fi
-    fi
-    
-    # 检查厂商描述
-    if [ -f "$device_path/manufacturer" ]; then
-        local manufacturer=$($CAT_CMD "$device_path/manufacturer" 2>/dev/null | tr '[:upper:]' '[:lower:]')
-        if $ECHO_CMD "$manufacturer" | $GREP_CMD -q "hub"; then
-            return 0  # 是USB HUB
-        fi
-    fi
-    
-    # 检查设备名称
-    local device_name=$($LS_CMD "$device_path" 2>/dev/null | $GREP_CMD -E "usb[0-9]+" || $ECHO_CMD "")
-    if [ -n "$device_name" ]; then
-        # 如果设备名称包含usb后跟数字，很可能是HUB控制器
-        if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+$' && [ "$busid" != "1-1" ]; then
-            # 检查是否是根HUB (通常1-1是第一个设备，其他可能是HUB)
-            if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+(\.[0-9]+)+$'; then
-                return 1  # 可能是普通设备
-            else
-                # 简单启发式：如果设备没有子设备且名称模式匹配，可能是HUB
-                local child_count=$($LS_CMD "$device_path" 2>/dev/null | $GREP_CMD -cE '^[0-9]+-[0-9]+')
-                if [ "$child_count" -gt 1 ]; then
-                    return 0  # 有多个子设备，可能是HUB
-                fi
-            fi
-        fi
-    fi
-    
     return 1  # 不是USB HUB
 }
 
@@ -118,25 +73,25 @@ read_config() {
 # 获取所有USB设备（忽略HUB设备）
 get_all_usb_devices() {
     for device in /sys/bus/usb/devices/*; do
-        local busid=$($BASENAME_CMD "$device")
+        local busid=$(basename "$device")
         # 只匹配有效的busid格式 (数字-数字)
-        if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+(\.[0-9]+)*$'; then
+        if echo "$busid" | grep -qE '^[0-9]+-[0-9]+(\.[0-9]+)*$'; then
             # 忽略USB HUB设备
             if ! is_usb_hub "$busid"; then
-                $ECHO_CMD "$busid"
+                echo "$busid"
             else
                 log_debug "Ignoring USB HUB device: $busid"
             fi
         fi
-    done | $SORT_CMD
+    done | sort
 }
 
 # 获取已绑定的USB设备
 get_bound_devices() {
     if [ -d "/sys/bus/usb/drivers/usbip-host" ]; then
-        $LS_CMD /sys/bus/usb/drivers/usbip-host/ 2>/dev/null | $GREP_CMD -E '^[0-9]+-[0-9]+(\.[0-9]+)*$' | $SORT_CMD
+        ls /sys/bus/usb/drivers/usbip-host/ 2>/dev/null | grep -E '^[0-9]+-[0-9]+(\.[0-9]+)*$' | sort
     else
-        $ECHO_CMD ""
+        echo ""
     fi
 }
 
@@ -179,7 +134,10 @@ apply_binding_policy() {
             log_info "Applying 'all' registration mode"
             # 绑定所有设备（已自动忽略HUB）
             for busid in $all_devices; do
-                if ! $ECHO_CMD "$bound_devices" | $GREP_CMD -q "^$busid$"; then
+                if ! echo "$bound_devices" | grep -q "^$busid$"; then
+                    if is_usb_hub "$busid"; then
+                        continue
+                    fi
                     bind_device "$busid"
                 fi
             done
@@ -191,12 +149,11 @@ apply_binding_policy() {
             for busid in $CONFIG_DEVICE_LIST; do
                 # 即使白名单中包含HUB设备，也忽略它
                 if is_usb_hub "$busid"; then
-                    log_warn "Ignoring USB HUB device in whitelist: $busid"
                     continue
                 fi
                 
-                if $ECHO_CMD "$all_devices" | $GREP_CMD -q "^$busid$"; then
-                    if ! $ECHO_CMD "$bound_devices" | $GREP_CMD -q "^$busid$"; then
+                if echo "$all_devices" | grep -q "^$busid$"; then
+                    if ! echo "$bound_devices" | grep -q "^$busid$"; then
                         bind_device "$busid"
                     fi
                 else
@@ -206,7 +163,7 @@ apply_binding_policy() {
             
             # 解绑不在白名单中的已绑定设备
             for busid in $bound_devices; do
-                if ! $ECHO_CMD "$CONFIG_DEVICE_LIST" | $GREP_CMD -q "$busid"; then
+                if ! echo "$CONFIG_DEVICE_LIST" | grep -q "$busid"; then
                     unbind_device "$busid"
                 fi
             done
@@ -216,8 +173,8 @@ apply_binding_policy() {
             log_info "Applying 'blacklist' registration mode"
             # 绑定不在黑名单中的设备
             for busid in $all_devices; do
-                if ! $ECHO_CMD "$CONFIG_DEVICE_LIST" | $GREP_CMD -q "$busid"; then
-                    if ! $ECHO_CMD "$bound_devices" | $GREP_CMD -q "^$busid$"; then
+                if ! echo "$CONFIG_DEVICE_LIST" | grep -q "$busid"; then
+                    if ! echo "$bound_devices" | grep -q "^$busid$"; then
                         bind_device "$busid"
                     fi
                 fi
@@ -225,7 +182,7 @@ apply_binding_policy() {
             
             # 解绑在黑名单中的设备
             for busid in $bound_devices; do
-                if $ECHO_CMD "$CONFIG_DEVICE_LIST" | $GREP_CMD -q "$busid"; then
+                if echo "$CONFIG_DEVICE_LIST" | grep -q "$busid"; then
                     unbind_device "$busid"
                 fi
             done
@@ -271,7 +228,7 @@ monitor_usb_devices() {
     local changed=0
     
     while true; do
-        $SLEEP_CMD 5
+        sleep 5
         
         # 重新读取配置，支持配置热更新
         read_config
