@@ -20,6 +20,18 @@ luci-app-usbip-server is a comprehensive OpenWRT LuCI application designed speci
   - Whitelist Mode (Share only selected devices)
   - Blacklist Mode (Share all except selected devices)
 
+## Dependencies
+
+- `usbip`
+- `usbip-server`
+- `usbip-client`
+- `kmod-usbip`
+- `kmod-usbip-client`
+- `kmod-usbip-server`
+- `lua`
+- `luci-base`
+- `luci-compat`
+
 ## System Requirements
 
 - OpenWRT 19.07 or higher
