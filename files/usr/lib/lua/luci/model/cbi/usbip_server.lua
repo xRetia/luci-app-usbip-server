@@ -87,10 +87,13 @@ function get_usb_devices()
         manufacturer = manufacturer:gsub("^%s*(.-)%s*$", "%1")
         product_name = product_name:gsub("^%s*(.-)%s*$", "%1")
         
-        local display_name = string.format("%s - %s %s (%s:%s)", device, manufacturer, product_name, vendor, product)
-        
-        devices[device] = display_name
-        detected_devices[device] = true
+        -- 过滤掉 Root hub 设备
+        if not (string.lower(product_name):find("root hub") or string.lower(manufacturer):find("root hub")) then
+            local display_name = string.format("%s - %s %s (%s:%s)", device, manufacturer, product_name, vendor, product)
+            
+            devices[device] = display_name
+            detected_devices[device] = true
+        end
     end
     
     -- 修复处理已配置设备列表的逻辑，确保正确处理空格分隔的值

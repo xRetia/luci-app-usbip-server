@@ -52,7 +52,7 @@ LMO_FILE="${LMO_DIR}/usbip_server.zh-cn.lmo"
 
 # 定义包信息
 PACKAGE_NAME="luci-app-usbip-server"
-PACKAGE_VERSION="1.0.1-1"
+PACKAGE_VERSION="1.0.2-1"
 ARCHITECTURE="all"
 PKG_SUFFIX="xretia_dsai"
 IPK_FILE="${OUTPUT_DIR}/${PACKAGE_NAME}_${PACKAGE_VERSION}_${PKG_SUFFIX}.ipk"
