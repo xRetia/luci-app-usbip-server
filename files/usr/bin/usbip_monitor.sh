@@ -123,13 +123,70 @@ read_config() {
     fi
 }
 
-# 获取所有USB设备
+# 检查设备是否为root hub
+is_root_hub() {
+    local busid="$1"
+    local device_path="/sys/bus/usb/devices/$busid"
+    
+    # 检查设备路径是否存在
+    if [ ! -d "$device_path" ]; then
+        return 1
+    fi
+    
+    # 方法1: 检查设备名称是否包含root hub
+    if [ -f "$device_path/product" ]; then
+        local product=$($CAT_CMD "$device_path/product" 2>/dev/null)
+        if $ECHO_CMD "$product" | $GREP_CMD -qi "root hub"; then
+            return 0
+        fi
+    fi
+    
+    # 方法2: 检查厂商ID和设备ID
+    if [ -f "$device_path/idVendor" ] && [ -f "$device_path/idProduct" ]; then
+        local vendor_id=$($CAT_CMD "$device_path/idVendor" 2>/dev/null)
+        local product_id=$($CAT_CMD "$device_path/idProduct" 2>/dev/null)
+        
+        # Linux Foundation的root hub通常有特定的厂商ID
+        if [ "$vendor_id" = "1d6b" ]; then
+            return 0
+        fi
+    fi
+    
+    # 方法3: 检查设备类型（hub类设备）
+    if [ -f "$device_path/bDeviceClass" ]; then
+        local device_class=$($CAT_CMD "$device_path/bDeviceClass" 2>/dev/null)
+        # 设备类09表示hub设备
+        if [ "$device_class" = "09" ]; then
+            # 进一步检查是否为root hub（通常是总线上的第一个设备）
+            if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-1$'; then
+                return 0
+            fi
+        fi
+    fi
+    
+    # 方法4: 检查父设备（root hub没有父设备或父设备是usb主机控制器）
+    local parent_path="$device_path/../"
+    if [ ! -d "$parent_path" ] || $BASENAME_CMD "$parent_path" | $GREP_CMD -q "usb"; then
+        if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-1$'; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# 获取所有USB设备（排除root hub）
 get_all_usb_devices() {
     for device in /sys/bus/usb/devices/*; do
         local busid=$($BASENAME_CMD "$device")
         # 只匹配有效的busid格式 (数字-数字)
         if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+(\.[0-9]+)*$'; then
-            $ECHO_CMD "$busid"
+            # 排除root hub
+            if ! is_root_hub "$busid"; then
+                $ECHO_CMD "$busid"
+            else
+                log_debug "Excluding root hub: $busid"
+            fi
         fi
     done | $SORT_CMD
 }
@@ -230,9 +287,9 @@ apply_binding_policy() {
     case "$CONFIG_REGISTRATION_MODE" in
         "all")
             if [ $devices_changed -eq 1 ]; then
-                log_info "Applying 'all' registration mode"
+                log_info "Applying 'all' registration mode (excluding root hubs)"
             fi
-            # 绑定所有设备
+            # 绑定所有设备（已经在get_all_usb_devices中排除了root hub）
             for busid in $all_devices; do
                 if ! $ECHO_CMD "$bound_devices" | $GREP_CMD -q "^$busid$"; then
                     bind_device "$busid"
