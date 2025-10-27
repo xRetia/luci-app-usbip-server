@@ -20,15 +20,6 @@ CAT_CMD="/bin/cat"
 TEST_CMD="/bin/test"
 ECHO_CMD="/bin/echo"
 
-# 防抖配置
-LAST_DEVICE_HASH=""
-LAST_BOUND_HASH=""
-FAILED_BIND_ATTEMPTS=""
-LAST_CONFIG_HASH=""
-LOG_COUNTER=0
-MAX_LOG_BURST=3
-LOG_BURST_WINDOW=30  # 30秒内最多输出3次详细日志
-
 # 日志函数
 log() {
     local level="$1"
@@ -49,18 +40,7 @@ log_error() {
 }
 
 log_debug() {
-    # 防抖：限制调试日志频率
-    local current_time=$(date +%s)
-    if [ -z "$LAST_DEBUG_TIME" ]; then
-        LAST_DEBUG_TIME=$current_time
-    fi
-    
-    local time_diff=$((current_time - LAST_DEBUG_TIME))
-    if [ $time_diff -ge 10 ] || [ "$FORCE_DEBUG" = "1" ]; then
-        log "debug" "$1"
-        LAST_DEBUG_TIME=$current_time
-        FORCE_DEBUG="0"
-    fi
+    log "debug" "$1"
 }
 
 log_fatal() {
@@ -68,34 +48,54 @@ log_fatal() {
     exit 1
 }
 
-# 计算字符串的简单哈希（用于防抖比较）
-calculate_hash() {
-    $ECHO_CMD "$1" | $AWK_CMD '{print length($0) ":" $0}' | md5sum | $AWK_CMD '{print $1}'
-}
-
-# 检查是否可以输出详细日志（防抖）
-can_log_detailed() {
-    local current_time=$(date +%s)
+# 检查设备是否为USB HUB
+is_usb_hub() {
+    local busid="$1"
+    local device_path="/sys/bus/usb/devices/$busid"
     
-    if [ -z "$LAST_DETAILED_LOG_TIME" ]; then
-        LAST_DETAILED_LOG_TIME=$current_time
-        LOG_COUNTER=1
-        return 0
+    # 检查设备类别，USB HUB的设备类别通常是09
+    if [ -f "$device_path/bDeviceClass" ]; then
+        local device_class=$($CAT_CMD "$device_path/bDeviceClass" 2>/dev/null)
+        if [ "$device_class" = "09" ]; then
+            return 0  # 是USB HUB
+        fi
     fi
     
-    local time_diff=$((current_time - LAST_DETAILED_LOG_TIME))
-    
-    if [ $time_diff -ge $LOG_BURST_WINDOW ]; then
-        # 时间窗口重置
-        LAST_DETAILED_LOG_TIME=$current_time
-        LOG_COUNTER=1
-        return 0
-    elif [ $LOG_COUNTER -lt $MAX_LOG_BURST ]; then
-        LOG_COUNTER=$((LOG_COUNTER + 1))
-        return 0
-    else
-        return 1
+    # 检查设备描述，包含"hub"或"HUB"
+    if [ -f "$device_path/product" ]; then
+        local product=$($CAT_CMD "$device_path/product" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        if $ECHO_CMD "$product" | $GREP_CMD -q "hub"; then
+            return 0  # 是USB HUB
+        fi
     fi
+    
+    # 检查厂商描述
+    if [ -f "$device_path/manufacturer" ]; then
+        local manufacturer=$($CAT_CMD "$device_path/manufacturer" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        if $ECHO_CMD "$manufacturer" | $GREP_CMD -q "hub"; then
+            return 0  # 是USB HUB
+        fi
+    fi
+    
+    # 检查设备名称
+    local device_name=$($LS_CMD "$device_path" 2>/dev/null | $GREP_CMD -E "usb[0-9]+" || $ECHO_CMD "")
+    if [ -n "$device_name" ]; then
+        # 如果设备名称包含usb后跟数字，很可能是HUB控制器
+        if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+$' && [ "$busid" != "1-1" ]; then
+            # 检查是否是根HUB (通常1-1是第一个设备，其他可能是HUB)
+            if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+(\.[0-9]+)+$'; then
+                return 1  # 可能是普通设备
+            else
+                # 简单启发式：如果设备没有子设备且名称模式匹配，可能是HUB
+                local child_count=$($LS_CMD "$device_path" 2>/dev/null | $GREP_CMD -cE '^[0-9]+-[0-9]+')
+                if [ "$child_count" -gt 1 ]; then
+                    return 0  # 有多个子设备，可能是HUB
+                fi
+            fi
+        fi
+    fi
+    
+    return 1  # 不是USB HUB
 }
 
 # 读取配置
@@ -112,72 +112,20 @@ read_config() {
     CONFIG_AUTO_BIND="${auto_bind:-0}"
     CONFIG_DEVICE_LIST="${device_list:-}"
     
-    # 检查配置是否变化
-    local current_config="$CONFIG_ENABLED:$CONFIG_REGISTRATION_MODE:$CONFIG_SERVER_PORT:$CONFIG_AUTO_BIND:$CONFIG_DEVICE_LIST"
-    local config_hash=$(calculate_hash "$current_config")
-    
-    if [ "$config_hash" != "$LAST_CONFIG_HASH" ]; then
-        log_info "Configuration changed: enabled=$CONFIG_ENABLED, mode=$CONFIG_REGISTRATION_MODE, port=$CONFIG_SERVER_PORT, auto_bind=$CONFIG_AUTO_BIND"
-        LAST_CONFIG_HASH="$config_hash"
-        FORCE_DEBUG="1"  # 强制输出一次调试日志
-    fi
+    log_debug "Config: enabled=$CONFIG_ENABLED, mode=$CONFIG_REGISTRATION_MODE, port=$CONFIG_SERVER_PORT, auto_bind=$CONFIG_AUTO_BIND, devices=$CONFIG_DEVICE_LIST"
 }
 
-# 检查设备是否为root hub
-is_root_hub() {
-    local busid="$1"
-    local device_path="/sys/bus/usb/devices/$busid"
-    
-    # 检查设备路径是否存在
-    if [ ! -d "$device_path" ]; then
-        return 1
-    fi
-    
-    # 方法1: 检查设备名称是否包含root hub/usb hub
-    if [ -f "$device_path/product" ]; then
-        local product=$($CAT_CMD "$device_path/product" 2>/dev/null)
-        if $ECHO_CMD "$product" | $GREP_CMD -iq "root.*hub"; then
-            return 0
-        fi
-        if $ECHO_CMD "$product" | $GREP_CMD -iq "usb.*hub"; then
-            return 0
-        fi
-    fi
-    
-    # 方法2: 检查厂商ID和设备ID
-    if [ -f "$device_path/idVendor" ] && [ -f "$device_path/idProduct" ]; then
-        local vendor_id=$($CAT_CMD "$device_path/idVendor" 2>/dev/null)
-        local product_id=$($CAT_CMD "$device_path/idProduct" 2>/dev/null)
-        
-        # Linux Foundation的root hub通常有特定的厂商ID
-        if [ "$vendor_id" = "1d6b" ]; then
-            return 0
-        fi
-    fi
-    
-    # 方法3: 检查设备类型（hub类设备）
-    if [ -f "$device_path/bDeviceClass" ]; then
-        local device_class=$($CAT_CMD "$device_path/bDeviceClass" 2>/dev/null)
-        # 设备类09表示hub设备
-        if [ "$device_class" = "09" ]; then\
-            return 0
-        fi
-    fi
-    
-    return 1
-}
-
-# 获取所有USB设备（排除root hub）
+# 获取所有USB设备（忽略HUB设备）
 get_all_usb_devices() {
     for device in /sys/bus/usb/devices/*; do
         local busid=$($BASENAME_CMD "$device")
         # 只匹配有效的busid格式 (数字-数字)
         if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-[0-9]+(\.[0-9]+)*$'; then
-            # 排除root hub
-            if ! is_root_hub "$busid"; then
+            # 忽略USB HUB设备
+            if ! is_usb_hub "$busid"; then
                 $ECHO_CMD "$busid"
             else
-                log_debug "Excluding root hub: $busid"
+                log_debug "Ignoring USB HUB device: $busid"
             fi
         fi
     done | $SORT_CMD
@@ -192,43 +140,15 @@ get_bound_devices() {
     fi
 }
 
-# 检查设备是否在失败列表中
-is_failed_bind_attempt() {
-    local busid="$1"
-    $ECHO_CMD "$FAILED_BIND_ATTEMPTS" | $GREP_CMD -q ":$busid:"
-}
-
-# 添加设备到失败列表
-add_failed_bind_attempt() {
-    local busid="$1"
-    if ! is_failed_bind_attempt "$busid"; then
-        FAILED_BIND_ATTEMPTS="${FAILED_BIND_ATTEMPTS}:${busid}:"
-        log_debug "Added $busid to failed bind attempts list"
-    fi
-}
-
 # 绑定设备
 bind_device() {
     local busid="$1"
-    
-    # 检查是否最近绑定失败过
-    if is_failed_bind_attempt "$busid"; then
-        log_debug "Skipping recently failed bind attempt for $busid"
-        return 1
-    fi
-    
     log_info "Binding device $busid"
     if $USBIP_CMD bind -b "$busid" >/dev/null 2>&1; then
         log_info "Successfully bound device $busid"
         return 0
     else
-        # 只有在第一次失败或长时间未尝试时才记录错误
-        if ! is_failed_bind_attempt "$busid"; then
-            log_error "Failed to bind device $busid"
-            add_failed_bind_attempt "$busid"
-        else
-            log_debug "Failed to bind device $busid (previously logged)"
-        fi
+        log_error "Failed to bind device $busid"
         return 1
     fi
 }
@@ -251,37 +171,13 @@ apply_binding_policy() {
     local all_devices=$(get_all_usb_devices)
     local bound_devices=$(get_bound_devices)
     
-    # 计算设备列表哈希用于防抖
-    local current_device_hash=$(calculate_hash "$all_devices")
-    local current_bound_hash=$(calculate_hash "$bound_devices")
-    
-    # 检查设备列表是否真正变化
-    local devices_changed=0
-    if [ "$current_device_hash" != "$LAST_DEVICE_HASH" ]; then
-        devices_changed=1
-        LAST_DEVICE_HASH="$current_device_hash"
-    fi
-    
-    if [ "$current_bound_hash" != "$LAST_BOUND_HASH" ]; then
-        devices_changed=1
-        LAST_BOUND_HASH="$current_bound_hash"
-    fi
-    
-    # 只有在设备变化或可以输出详细日志时才记录详细信息
-    if [ $devices_changed -eq 1 ] && can_log_detailed; then
-        log_debug "USB device change detected"
-        log_debug "All USB devices: $all_devices"
-        log_debug "Bound devices: $bound_devices"
-    elif [ $devices_changed -eq 1 ]; then
-        log_debug "USB device change detected (detailed logging throttled)"
-    fi
+    log_debug "All USB devices (excluding HUBs): $all_devices"
+    log_debug "Bound devices: $bound_devices"
     
     case "$CONFIG_REGISTRATION_MODE" in
         "all")
-            if [ $devices_changed -eq 1 ]; then
-                log_info "Applying 'all' registration mode (excluding root hubs)"
-            fi
-            # 绑定所有设备（已经在get_all_usb_devices中排除了root hub）
+            log_info "Applying 'all' registration mode"
+            # 绑定所有设备（已自动忽略HUB）
             for busid in $all_devices; do
                 if ! $ECHO_CMD "$bound_devices" | $GREP_CMD -q "^$busid$"; then
                     bind_device "$busid"
@@ -290,19 +186,21 @@ apply_binding_policy() {
             ;;
             
         "whitelist")
-            if [ $devices_changed -eq 1 ]; then
-                log_info "Applying 'whitelist' registration mode"
-            fi
+            log_info "Applying 'whitelist' registration mode"
             # 绑定白名单中的设备
             for busid in $CONFIG_DEVICE_LIST; do
+                # 即使白名单中包含HUB设备，也忽略它
+                if is_usb_hub "$busid"; then
+                    log_warn "Ignoring USB HUB device in whitelist: $busid"
+                    continue
+                fi
+                
                 if $ECHO_CMD "$all_devices" | $GREP_CMD -q "^$busid$"; then
                     if ! $ECHO_CMD "$bound_devices" | $GREP_CMD -q "^$busid$"; then
                         bind_device "$busid"
                     fi
                 else
-                    if can_log_detailed; then
-                        log_warn "Device $busid in whitelist not found"
-                    fi
+                    log_warn "Device $busid in whitelist not found"
                 fi
             done
             
@@ -315,9 +213,7 @@ apply_binding_policy() {
             ;;
             
         "blacklist")
-            if [ $devices_changed -eq 1 ]; then
-                log_info "Applying 'blacklist' registration mode"
-            fi
+            log_info "Applying 'blacklist' registration mode"
             # 绑定不在黑名单中的设备
             for busid in $all_devices; do
                 if ! $ECHO_CMD "$CONFIG_DEVICE_LIST" | $GREP_CMD -q "$busid"; then
@@ -368,40 +264,14 @@ stop_usbipd() {
     fi
 }
 
-# 清理失败的绑定尝试记录（定期清理）
-cleanup_failed_attempts() {
-    local current_time=$(date +%s)
-    
-    if [ -z "$LAST_CLEANUP_TIME" ]; then
-        LAST_CLEANUP_TIME=$current_time
-        return
-    fi
-    
-    local time_diff=$((current_time - LAST_CLEANUP_TIME))
-    
-    # 每5分钟清理一次失败记录
-    if [ $time_diff -ge 300 ] && [ -n "$FAILED_BIND_ATTEMPTS" ]; then
-        log_debug "Cleaning up failed bind attempts list"
-        FAILED_BIND_ATTEMPTS=""
-        LAST_CLEANUP_TIME=$current_time
-    fi
-}
-
 # 监控USB设备变化
 monitor_usb_devices() {
     local last_devices=$(get_all_usb_devices)
     local current_devices=""
     local changed=0
     
-    # 初始化哈希值
-    LAST_DEVICE_HASH=$(calculate_hash "$last_devices")
-    LAST_BOUND_HASH=$(calculate_hash "$(get_bound_devices)")
-    
     while true; do
         $SLEEP_CMD 5
-        
-        # 定期清理失败记录
-        cleanup_failed_attempts
         
         # 重新读取配置，支持配置热更新
         read_config
@@ -418,6 +288,9 @@ monitor_usb_devices() {
         
         # 检查设备变化
         if [ "$last_devices" != "$current_devices" ]; then
+            log_info "USB device change detected"
+            log_debug "Previous devices: $last_devices"
+            log_debug "Current devices: $current_devices"
             changed=1
         fi
         

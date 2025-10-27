@@ -87,8 +87,10 @@ function get_usb_devices()
         manufacturer = manufacturer:gsub("^%s*(.-)%s*$", "%1")
         product_name = product_name:gsub("^%s*(.-)%s*$", "%1")
         
-        -- 过滤掉 Root hub 设备
-        if not (string.lower(product_name):find("root hub") or string.lower(manufacturer):find("root hub")) then
+        -- 通过USB设备类别(bDeviceClass)来准确识别hub设备，Hub设备类别为09
+        local device_class = sys.exec(string.format("cat /sys/bus/usb/devices/%s/bDeviceClass 2>/dev/null", device)) or ""
+        device_class = device_class:gsub("%s+", "")
+        if device_class ~= "09" then
             local display_name = string.format("%s - %s %s (%s:%s)", device, manufacturer, product_name, vendor, product)
             
             devices[device] = display_name
