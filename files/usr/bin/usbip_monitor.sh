@@ -133,10 +133,13 @@ is_root_hub() {
         return 1
     fi
     
-    # 方法1: 检查设备名称是否包含root hub
+    # 方法1: 检查设备名称是否包含root hub/usb hub
     if [ -f "$device_path/product" ]; then
         local product=$($CAT_CMD "$device_path/product" 2>/dev/null)
-        if $ECHO_CMD "$product" | $GREP_CMD -qi "root hub"; then
+        if $ECHO_CMD "$product" | $GREP_CMD -iq "root.*hub"; then
+            return 0
+        fi
+        if $ECHO_CMD "$product" | $GREP_CMD -iq "usb.*hub"; then
             return 0
         fi
     fi
@@ -156,18 +159,7 @@ is_root_hub() {
     if [ -f "$device_path/bDeviceClass" ]; then
         local device_class=$($CAT_CMD "$device_path/bDeviceClass" 2>/dev/null)
         # 设备类09表示hub设备
-        if [ "$device_class" = "09" ]; then
-            # 进一步检查是否为root hub（通常是总线上的第一个设备）
-            if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-1$'; then
-                return 0
-            fi
-        fi
-    fi
-    
-    # 方法4: 检查父设备（root hub没有父设备或父设备是usb主机控制器）
-    local parent_path="$device_path/../"
-    if [ ! -d "$parent_path" ] || $BASENAME_CMD "$parent_path" | $GREP_CMD -q "usb"; then
-        if $ECHO_CMD "$busid" | $GREP_CMD -qE '^[0-9]+-1$'; then
+        if [ "$device_class" = "09" ]; then\
             return 0
         fi
     fi
